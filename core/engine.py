@@ -1,6 +1,8 @@
 import abc
 import argparse
 import numpy as np
+import re
+
 from transformers import (
     AutoModelForSeq2SeqLM, 
     AutoTokenizer, 
@@ -9,7 +11,12 @@ from transformers import (
     pipeline
 )
 
-from .classifier_guidance import ClassifierGuidanceIntentLogitsProcessor, ClassifierGuidanceLogitsProcessor
+from .classifier_guidance import (
+    ClassifierGuidanceIntentLogitsProcessor, 
+    ClassifierGuidanceLogitsProcessor,
+    UnlikelihoodDecodingLogitsProcessor
+)
+
 
 class Engine(abc.ABC):
     def __init__(self, args: argparse.ArgumentParser) -> None:
@@ -65,7 +72,32 @@ class BaselineEngine(Engine):
     def _predict(self, batch):
         outputs = self.generate(batch)
         return outputs[0]
+
+
+class RulesBasedEngine(Engine):
+    def __init__(self, args: argparse.ArgumentParser) -> None:
+        self.evaluator = pipeline(
+            "text-classification", model=args.evaluator_load_path, 
+            tokenizer="distilbert-base-uncased", device=args.device
+        )
         
+        super().__init__(args)
+
+    def _predict(self, batch):
+        sugg_intents = self.evaluator(batch["suggestions"][0].split("//"))
+        sugg_intents = [s["label"] for s in sugg_intents]
+
+        outputs = self.generate(batch, num_return_sequences=5)
+        candidates = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
+
+        cands_intents = self.evaluator(candidates)
+        cands_intents = [s["label"] for s in cands_intents]
+        for i, intent in enumerate(cands_intents):
+            if intent not in sugg_intents:
+                return outputs[i]
+
+        return outputs[0]
+
         
 class RerankerActionEngine(Engine):
     def __init__(self, args: argparse.ArgumentParser) -> None:
@@ -158,14 +190,13 @@ class NiftyIntentEngine(Engine):
 
         self.logits_processor = ClassifierGuidanceIntentLogitsProcessor(
             self.intent_predictor.model, self.intent_predictor.tokenizer, 
-            self.tokenizer, alpha=1.0
+            self.tokenizer, alpha=args.alpha
         )
 
     def _predict(self, batch):
         sugg_intents = self.evaluator(batch["suggestions"][0].split("//"))
         sugg_intents = [s["label"] for s in sugg_intents]
         
-        #next_intents = self.intent_predictor(batch["messages"][0] + "[SEP]" + batch["prefix"][0])[0]
         next_intents = self.intent_predictor(batch["messages"][0])[0]
         for intent in next_intents:
             if intent["label"] in sugg_intents:
@@ -208,9 +239,6 @@ class OracleEngine(Engine):
         return outputs[0]
 
 
-from core.classifier_guidance import UnlikelihoodDecodingLogitsProcessor
-import re
-
 class UnlikelihoodDecodingEngine(Engine):
     def __init__(self, args: argparse.ArgumentParser) -> None:
         self.evaluator = pipeline(
@@ -252,7 +280,8 @@ ENGINES = {
     "nifty-action": NiftyActionEngine,
     "nifty-intent": NiftyIntentEngine,
     "oracle": OracleEngine,
-    "unlikelihood": UnlikelihoodDecodingEngine
+    "unlikelihood": UnlikelihoodDecodingEngine,
+    "rules-based": RulesBasedEngine
 }
 
 

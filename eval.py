@@ -17,20 +17,21 @@ else:
 disable_caching()
 
 model_type = "bb"
+dataset = "multiwoz"
 
 def parse_args():
-    dataset = "dstc8"
     parser = argparse.ArgumentParser()
     parser.add_argument("--test_tsv_path", type=str, default=f"data/{dataset}-valid.tsv")
     parser.add_argument("--generator_load_path", type=str, default=f"models/{model_type}-{dataset}")
     parser.add_argument("--classifier_load_path", type=str, default=f"models/cls-{dataset}-action")
     parser.add_argument("--evaluator_load_path", type=str, default=f"models/intent-detect-{dataset}")
     parser.add_argument("--intent_predict_load_path", type=str, default=f"models/cls-{dataset}-intent")
-    parser.add_argument("--method", type=str, default="reranker-action", choices=list(ENGINES.keys()))
+    parser.add_argument("--method", type=str, default="nifty-intent", choices=list(ENGINES.keys()))
     parser.add_argument("--max_message_length", type=int, default=64)
     parser.add_argument("--max_response_length", type=int, default=32)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", type=str, default="cuda")
+    parser.add_argument("--alpha", type=float, default=0.5)
 
     return parser.parse_args()
 
@@ -63,10 +64,7 @@ def preprocess(batch, tokenizer, args):
     return data
 
 
-def main():
-    args = parse_args()
-    set_random_seed(args.seed)
-
+def _main(args):
     method = get_engine(args.method)(args)
 
     dataset = load_dataset(args.test_tsv_path,  lambda x: preprocess(x, method.tokenizer, args))
@@ -75,20 +73,25 @@ def main():
 
     print(f"Dataset size: {len(dataset)}")
 
-    # Extract random subset of 100 samples
-    dataset = dataset.shuffle(seed=args.seed)
-    #dataset = dataset.select(range(100))
-
     if not os.path.isdir("results"):
         os.makedirs("results")
     task = get_task(args.test_tsv_path)
 
-    fpath = f"results/{args.method}-{model_type}-{task}.tsv"
+    fpath = f"results/{args.method}-{model_type}-{task}-{args.alpha}.tsv"
     
     with open(fpath, "w", encoding="utf-8") as f:
         dataset = dataset.map(
             lambda x: method.predict(x, f), batched=True, batch_size=1
         )
+
+
+def main():
+    args = parse_args()
+    set_random_seed(args.seed)
+    _main(args)
+
+
+ 
 
 
 if __name__ == "__main__":

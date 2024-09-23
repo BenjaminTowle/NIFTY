@@ -12,7 +12,6 @@ from transformers import (
 
 from core.utils import set_random_seed, load_dataset
 
-os.environ["WANDB_DISABLED"] = "true"
 disable_caching()
 
 ############################################
@@ -67,11 +66,6 @@ def preprocess_action(batch, tokenizer, max_length=MAX_LENGTH):
     }
 
 def preprocess_intent(batch, tokenizer, max_length=MAX_LENGTH):
-    #responses = batch["responses"]
-    #batch = {k: [v for v, r in zip(batch[k], responses) if r is not None] for k in batch.keys()}
-    #if None in responses:
-     #   print("None in responses")
-    
     responses = [r.split() if r is not None else "Good bye .".split() for r in batch["responses"]]  # A couple of None responses in dstc8
     split_idxs = [randint(1, len(ids)) for ids in responses]
 

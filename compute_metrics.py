@@ -7,11 +7,14 @@ from rouge_score import rouge_scorer
 import evaluate
 
 
+model_type = "t5"
+
+
 def parse_args():
     dataset = "dstc8"
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", type=str, default=dataset)
-    parser.add_argument("--results_path", type=str, default=f"results/nifty-intent-bb-{dataset}.tsv")
+    parser.add_argument("--results_path", type=str, default=f"results/rules-based-{model_type}-{dataset}.tsv")
     parser.add_argument("--evaluator_load_path", type=str, default=f"models/intent-detect-{dataset}")
     parser.add_argument("--device", type=str, default="cuda")
 
@@ -62,6 +65,7 @@ def compute_individual_metrics(args, path: str):
 def main():
     args = parse_args()
     metrics = compute_individual_metrics(args, args.results_path)
+    #print(metrics)
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ from peft import LoraConfig, TaskType, get_peft_model
 
 from core.utils import set_random_seed, load_dataset
 
-os.environ["WANDB_DISABLED"] = "true"
+
 disable_caching()
 
 

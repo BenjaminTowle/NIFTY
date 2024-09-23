@@ -11,7 +11,6 @@ from transformers import (
 
 from core.utils import set_random_seed, load_dataset
 
-os.environ["WANDB_DISABLED"] = "true"
 disable_caching()
 
 ############################################
